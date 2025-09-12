@@ -5,7 +5,7 @@ import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter basename="/digital-mental-health-platform/"> {/* set basename */}
+    <BrowserRouter basename="/digital-mental-health-platform/"> {/* <-- important */}
       <App />
     </BrowserRouter>
   </React.StrictMode>
