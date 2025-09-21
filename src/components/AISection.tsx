@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, BookOpen, Music, BarChart3, Phone, Calendar, Heart, Send, Mic, Play, Pause, SkipForward, Volume2 } from 'lucide-react';
+import { MessageCircle, BookOpen, Music, BarChart3, Phone, Calendar, Heart, Send, Mic, Play, Pause, SkipForward, Volume2, VolumeX, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Slider } from './ui/slider';
+import { Alert, AlertDescription } from './ui/alert';
 import { EmergencyResources } from './EmergencyResources';
 
 interface ChatMessage {
@@ -26,11 +28,52 @@ interface JournalEntry {
 
 
 const musicPlaylists = [
-  { id: 1, name: 'Calm & Peaceful', mood: 'anxious', description: 'Soothing melodies for anxiety relief', emoji: '🌊' },
-  { id: 2, name: 'Energy Boost', mood: 'tired', description: 'Uplifting songs to energize you', emoji: '⚡' },
-  { id: 3, name: 'Focus Flow', mood: 'distracted', description: 'Instrumental music for concentration', emoji: '🎯' },
-  { id: 4, name: 'Happiness & Joy', mood: 'sad', description: 'Cheerful tunes to lift your spirits', emoji: '🌈' },
-  { id: 5, name: 'Sleep & Rest', mood: 'restless', description: 'Gentle sounds for better sleep', emoji: '🌙' },
+  { 
+    id: 1, 
+    name: 'Calm & Peaceful', 
+    mood: 'anxious', 
+    description: 'Soothing melodies for anxiety relief', 
+    emoji: '🌊',
+    // Using data URLs for simple therapeutic tones
+    frequency: 174,
+    color: 'blue'
+  },
+  { 
+    id: 2, 
+    name: 'Energy Boost', 
+    mood: 'tired', 
+    description: 'Uplifting songs to energize you', 
+    emoji: '⚡',
+    frequency: 396,
+    color: 'orange'
+  },
+  { 
+    id: 3, 
+    name: 'Focus Flow', 
+    mood: 'distracted', 
+    description: 'Instrumental music for concentration', 
+    emoji: '🎯',
+    frequency: 528,
+    color: 'green'
+  },
+  { 
+    id: 4, 
+    name: 'Happiness & Joy', 
+    mood: 'sad', 
+    description: 'Cheerful tunes to lift your spirits', 
+    emoji: '🌈',
+    frequency: 639,
+    color: 'yellow'
+  },
+  { 
+    id: 5, 
+    name: 'Sleep & Rest', 
+    mood: 'restless', 
+    description: 'Gentle sounds for better sleep', 
+    emoji: '🌙',
+    frequency: 111,
+    color: 'purple'
+  },
 ];
 
 const dailyRoutines = [
@@ -71,6 +114,54 @@ const dailyRoutines = [
     icon: '🌙'
   },
 ];
+
+// Global audio control for emergency stops
+let globalAudioInstance: HTMLAudioElement | null = null;
+
+// Global emergency stop function that can be called from anywhere
+export const globalEmergencyStopAudio = () => {
+  // Stop global audio instance
+  if (globalAudioInstance) {
+    try {
+      globalAudioInstance.pause();
+      globalAudioInstance.currentTime = 0;
+      globalAudioInstance.volume = 0;
+      URL.revokeObjectURL(globalAudioInstance.src);
+      globalAudioInstance.remove();
+    } catch (e) {
+      console.log('Error stopping global audio:', e);
+    }
+    globalAudioInstance = null;
+  }
+  
+  // Stop ALL audio elements on the page aggressively
+  const audioElements = document.querySelectorAll('audio');
+  audioElements.forEach(audio => {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = 0;
+      audio.muted = true;
+      audio.loop = false;
+      audio.autoplay = false;
+      audio.remove(); // Remove from DOM completely
+    } catch (e) {
+      console.log('Error stopping audio element:', e);
+    }
+  });
+
+  // Kill any Web Audio API contexts
+  try {
+    if (window.AudioContext) {
+      const contexts = document.querySelectorAll('[data-audio-context]');
+      contexts.forEach(ctx => ctx.remove());
+    }
+  } catch (e) {
+    console.log('Error cleaning audio contexts:', e);
+  }
+  
+  console.log('🛑 GLOBAL EMERGENCY STOP: All audio AGGRESSIVELY stopped and removed');
+};
 
 export function AISection({ initialTab = 'chatbot' }: { initialTab?: string }) {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -117,6 +208,63 @@ export function AISection({ initialTab = 'chatbot' }: { initialTab?: string }) {
   const [detectedMood, setDetectedMood] = useState<string>('neutral');
   const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [volume, setVolume] = useState(0.7);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [audioSupported, setAudioSupported] = useState(true);
+  const [audioDisabled, setAudioDisabled] = useState(true); // DISABLE AUDIO BY DEFAULT
+
+  // AGGRESSIVE Emergency stop function
+  const emergencyStopAudio = () => {
+    console.log('🛑 STARTING AGGRESSIVE AUDIO KILL SEQUENCE...');
+    
+    // Stop current component audio
+    if (currentAudio) {
+      try {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio.volume = 0;
+        currentAudio.muted = true;
+        currentAudio.loop = false;
+        currentAudio.autoplay = false;
+        URL.revokeObjectURL(currentAudio.src);
+        currentAudio.remove();
+      } catch (e) {
+        console.log('Error stopping current audio:', e);
+      }
+      setCurrentAudio(null);
+    }
+    
+    // Use global emergency stop
+    globalEmergencyStopAudio();
+    
+    // Additional aggressive cleanup
+    try {
+      // Kill any remaining audio sources
+      const audioSources = document.querySelectorAll('source[type*="audio"]');
+      audioSources.forEach(source => source.remove());
+      
+      // Kill any audio URLs in memory
+      const objectURLs = Object.getOwnPropertyNames(window).filter(prop => prop.includes('blob:'));
+      objectURLs.forEach(url => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          // Ignore errors
+        }
+      });
+    } catch (e) {
+      console.log('Additional cleanup error:', e);
+    }
+    
+    // Reset all audio-related state
+    setIsPlaying(false);
+    setCurrentlyPlaying(null);
+    setAudioError('Audio has been disabled for safety. Click "Enable Audio" to test again.');
+    setAudioDisabled(true);
+    
+    console.log('🛑 AGGRESSIVE EMERGENCY STOP COMPLETE: All audio killed and disabled');
+  };
 
   // Save chat messages to localStorage whenever they change
   useEffect(() => {
@@ -287,24 +435,197 @@ export function AISection({ initialTab = 'chatbot' }: { initialTab?: string }) {
     }
   };
 
-  const playPlaylist = (playlistId: number) => {
-    if (currentlyPlaying === playlistId && isPlaying) {
-      // Pause current playlist
-      setIsPlaying(false);
-    } else {
-      // Play new playlist or resume current
-      setCurrentlyPlaying(playlistId);
-      setIsPlaying(true);
+  // Generate a simple sine wave as data URL
+  const generateAudioDataURL = (frequency: number, duration: number = 10, sampleRate: number = 44100) => {
+    const numSamples = duration * sampleRate;
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+    
+    // WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + numSamples * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, numSamples * 2, true);
+    
+    // Generate sine wave
+    let offset = 44;
+    for (let i = 0; i < numSamples; i++) {
+      const time = i / sampleRate;
+      const amplitude = 0.3;
+      const fadeIn = Math.min(time / 0.5, 1); // 0.5s fade in
+      const fadeOut = Math.min((duration - time) / 0.5, 1); // 0.5s fade out
+      const envelope = fadeIn * fadeOut;
+      const sample = Math.sin(2 * Math.PI * frequency * time) * amplitude * envelope;
+      const intSample = Math.max(-32767, Math.min(32767, sample * 32767));
+      view.setInt16(offset, intSample, true);
+      offset += 2;
+    }
+    
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    return URL.createObjectURL(blob);
+  };
+
+  const playPlaylist = async (playlistId: number) => {
+    // Check if audio is disabled
+    if (audioDisabled) {
+      setAudioError('🛑 Audio is currently disabled for safety. Click "Enable Audio" below to test audio functionality.');
+      return;
+    }
+    
+    try {
+      setAudioError(null);
       
-      // Simulate playing music (in a real app, you'd use actual audio files)
-      console.log(`Playing playlist: ${musicPlaylists.find(p => p.id === playlistId)?.name}`);
+      if (currentlyPlaying === playlistId && isPlaying && currentAudio) {
+        // Pause current playlist
+        currentAudio.pause();
+        setIsPlaying(false);
+        return;
+      } else if (currentlyPlaying === playlistId && !isPlaying && currentAudio) {
+        // Resume current playlist
+        try {
+          await currentAudio.play();
+          setIsPlaying(true);
+          return;
+        } catch (error) {
+          console.log('Resume failed, creating new audio');
+        }
+      }
+
+      // Stop any currently playing audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        URL.revokeObjectURL(currentAudio.src);
+      }
+
+      // Find the playlist
+      const playlist = musicPlaylists.find(p => p.id === playlistId);
+      if (!playlist) return;
+
+      // Create audio element with generated tone
+      const audioDataURL = generateAudioDataURL(playlist.frequency, 10); // 10 second loop
+      const audio = new Audio(audioDataURL);
+      
+      audio.loop = true;
+      audio.volume = volume;
+      
+      // Set up event handlers
+      audio.onended = () => {
+        setIsPlaying(false);
+        setCurrentlyPlaying(null);
+        setCurrentAudio(null);
+      };
+      
+      audio.onerror = (e) => {
+        console.error('Audio error:', e);
+        setAudioError('Failed to play audio. Please try again.');
+        setIsPlaying(false);
+        setCurrentlyPlaying(null);
+        setCurrentAudio(null);
+      };
+
+      audio.oncanplay = () => {
+        console.log(`Audio ready: ${playlist.name} (${playlist.frequency}Hz)`);
+      };
+
+      // Try to play
+      try {
+        await audio.play();
+        setCurrentAudio(audio);
+        globalAudioInstance = audio; // Store globally for emergency stops
+        setCurrentlyPlaying(playlistId);
+        setIsPlaying(true);
+        console.log(`Now playing: ${playlist.name} (${playlist.frequency}Hz therapeutic tone)`);
+      } catch (error) {
+        console.error('Play failed:', error);
+        setAudioError('Browser blocked audio playback. Please click the button again to enable audio.');
+        URL.revokeObjectURL(audioDataURL);
+      }
+      
+    } catch (error) {
+      console.error('Audio playback error:', error);
+      setAudioError(`Unable to play audio: ${error.message}`);
+      setIsPlaying(false);
+      setCurrentlyPlaying(null);
+      setCurrentAudio(null);
     }
   };
 
   const stopAllMusic = () => {
-    setIsPlaying(false);
-    setCurrentlyPlaying(null);
+    emergencyStopAudio(); // Use the emergency stop function
   };
+
+  const adjustVolume = (newVolume: number) => {
+    setVolume(newVolume);
+    if (currentAudio) {
+      currentAudio.volume = newVolume;
+    }
+  };
+
+  // Test audio function
+  const testAudio = async () => {
+    try {
+      setAudioError(null);
+      const testDataURL = generateAudioDataURL(440, 2); // 2 second 440Hz test tone
+      const testAudio = new Audio(testDataURL);
+      testAudio.volume = 0.5;
+      await testAudio.play();
+      
+      setTimeout(() => {
+        testAudio.pause();
+        URL.revokeObjectURL(testDataURL);
+      }, 2000);
+      
+      console.log('Audio test successful');
+    } catch (error) {
+      console.error('Audio test failed:', error);
+      setAudioError('Audio test failed. Please check your device volume and browser settings.');
+      setAudioSupported(false);
+    }
+  };
+
+  // IMMEDIATE Emergency stop all audio when component first loads
+  useEffect(() => {
+    console.log('🛑 AI Section loading - running immediate emergency audio stop...');
+    
+    // Run the stop function immediately
+    setTimeout(() => {
+      emergencyStopAudio();
+    }, 0);
+    
+    // Run it again after a short delay to catch any delayed audio
+    setTimeout(() => {
+      emergencyStopAudio();
+    }, 500);
+    
+    // Run it one more time after 2 seconds
+    setTimeout(() => {
+      emergencyStopAudio();
+    }, 2000);
+    
+  }, []);
+
+  // Clean up audio when component unmounts
+  useEffect(() => {
+    return () => {
+      emergencyStopAudio();
+    };
+  }, []);
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
@@ -484,11 +805,102 @@ export function AISection({ initialTab = 'chatbot' }: { initialTab?: string }) {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* EMERGENCY AUDIO CONTROLS */}
+              <div className="mb-4 p-6 bg-red-50 rounded-lg border-2 border-red-400 shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <VolumeX className="w-8 h-8 text-red-600" />
+                    <div>
+                      <h4 className="font-bold text-red-800 text-lg">🛑 AUDIO EMERGENCY CONTROLS</h4>
+                      <p className="text-sm text-red-700">If you hear continuous audio, click STOP NOW!</p>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={emergencyStopAudio}
+                    className="bg-red-600 hover:bg-red-700 text-white border-0 text-lg px-6 py-3"
+                    size="lg"
+                  >
+                    🛑 STOP ALL AUDIO NOW
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between pt-4 border-t border-red-200">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-red-700">
+                      Audio Status: {audioDisabled ? '🚫 DISABLED (Safe)' : '⚠️ ENABLED (Risk)'}
+                    </span>
+                  </div>
+                  <div className="flex space-x-2">
+                    {audioDisabled ? (
+                      <Button 
+                        onClick={() => {
+                          setAudioDisabled(false);
+                          setAudioError('⚠️ Audio enabled. Be ready to click STOP if needed!');
+                        }}
+                        variant="outline"
+                        className="border-orange-400 text-orange-700 hover:bg-orange-50"
+                      >
+                        ⚠️ Enable Audio (Test Only)
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={() => {
+                          emergencyStopAudio();
+                          setAudioDisabled(true);
+                        }}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        ✅ Disable Audio (Safe Mode)
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Audio Error Alert */}
+              {audioError && (
+                <Alert className="mb-4 border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    {audioError}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* User Instructions */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start space-x-3">
+                  <Music className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-blue-800 mb-1">How to Use Music Therapy</h4>
+                    <p className="text-sm text-blue-700 mb-2">
+                      Our therapeutic audio uses specific frequencies known to promote relaxation and well-being.
+                    </p>
+                    <p className="text-xs text-blue-600 mb-3">
+                      💡 For best results: Use headphones, find a quiet space, and allow the sounds to play for at least 10 minutes.
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-blue-500">
+                        🔧 Can't hear audio? Test your audio first →
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={testAudio}
+                        className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                      >
+                        🔊 Test Audio
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Currently Playing */}
               {currentlyPlaying && isPlaying && (
                 <Card className="mb-6 border border-purple-200 bg-purple-50">
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-3">
                         <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
                           <Music className="w-6 h-6 text-purple-600 animate-pulse" />
@@ -519,8 +931,34 @@ export function AISection({ initialTab = 'chatbot' }: { initialTab?: string }) {
                         </Button>
                       </div>
                     </div>
+                    
+                    {/* Volume Control */}
+                    <div className="flex items-center space-x-3">
+                      <Volume2 className="w-4 h-4 text-purple-600" />
+                      <div className="flex-1">
+                        <Slider
+                          value={[volume * 100]}
+                          onValueChange={(value) => adjustVolume(value[0] / 100)}
+                          max={100}
+                          step={5}
+                          className="w-full"
+                        />
+                      </div>
+                      <span className="text-xs text-purple-600 min-w-[3rem]">
+                        {Math.round(volume * 100)}%
+                      </span>
+                    </div>
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Audio Context Activation Notice */}
+              {!currentlyPlaying && (
+                <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-sm text-amber-800">
+                    🎵 Click any "Play" button below to start therapeutic audio. Your browser may ask for permission to play audio.
+                  </p>
+                </div>
               )}
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -539,6 +977,7 @@ export function AISection({ initialTab = 'chatbot' }: { initialTab?: string }) {
                         <div>
                           <h3 className="font-semibold">{playlist.name}</h3>
                           <p className="text-xs text-gray-500">For when you're {playlist.mood}</p>
+                          <p className="text-xs text-blue-600">{playlist.frequency}Hz therapeutic frequency</p>
                         </div>
                       </div>
                       <p className="text-sm text-gray-600 mb-3">{playlist.description}</p>
@@ -562,16 +1001,25 @@ export function AISection({ initialTab = 'chatbot' }: { initialTab?: string }) {
                           )}
                         </Button>
                         {currentlyPlaying === playlist.id && isPlaying && (
-                          <Button variant="outline" size="sm">
-                            <Volume2 className="w-4 h-4" />
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => adjustVolume(volume === 0 ? 0.7 : 0)}
+                          >
+                            {volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                           </Button>
                         )}
                       </div>
                       {currentlyPlaying === playlist.id && isPlaying && (
                         <div className="mt-3 pt-3 border-t border-gray-200">
-                          <div className="flex items-center space-x-2 text-xs text-green-600">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                            <span>Playing therapeutic sounds...</span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2 text-xs text-green-600">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              <span>Playing {playlist.frequency}Hz tone</span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              🔊 {Math.round(volume * 100)}%
+                            </div>
                           </div>
                         </div>
                       )}
